@@ -1,0 +1,27 @@
+services:
+  DSS-db:
+    image: postgres
+    ports:
+      - "5460:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=dss-db
+    networks:
+      - dss-network
+    container_name: dss-db
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+volumes:
+  dbdata:
+    driver: local
+
+networks:
+  dss-network:
+    driver: bridge
