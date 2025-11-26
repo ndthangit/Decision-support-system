@@ -14,7 +14,6 @@ async def lifespan(app: FastAPI):
     await migrate_database()
     yield
 
-
 app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
@@ -24,6 +23,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
