@@ -11,6 +11,6 @@ class Lecturer(SQLModel, table=True):
     __tablename__ = "lecturer"
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     full_name: str = Field(default=None, max_length=255)
-    email: EmailStr = Field(unique=True, index=True, max_length=255)
+    email: EmailStr | None = Field(index=True, max_length=255)
     research_areas: list["ResearchArea"] = Relationship(back_populates="lecturers", link_model=LecturerResearchAreaLink)
     interested_studies: list["InterestedStudy"] = Relationship(back_populates="lecturers", link_model=LecturerInterestedStudyLink)
