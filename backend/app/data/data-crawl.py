@@ -1,6 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+import uuid
+from pathlib import Path
 import time
 import urllib3
 from requests.adapters import HTTPAdapter
@@ -78,7 +80,6 @@ for page in range(1, 7):
 
             all_staff_data.append({
                 'Name': name,
-                'Detail_URL': detail_url,
                 'Email': email,
                 'Research_Areas': research_areas,
                 'Interested_Studies': interested_studies
@@ -88,4 +89,77 @@ for page in range(1, 7):
         print(f"{e}")
 
 df = pd.DataFrame(all_staff_data)
-df.to_excel("SoICT_Staff_List.xlsx", index=False)
+
+data_dir = Path(__file__).parent
+sql_path = data_dir / "init.sql"
+
+def _esc(s: str) -> str:
+    return str(s).replace("'", "''")
+
+ra_set = set()
+is_set = set()
+lecturers = []
+for row in all_staff_data:
+    name = row.get('Name') or ''
+    email = row.get('Email') or None
+    ra_raw = row.get('Research_Areas') or ''
+    is_raw = row.get('Interested_Studies') or ''
+    ra_names = [s.strip() for s in str(ra_raw).split(',') if s.strip()]
+    is_names = [s.strip() for s in str(is_raw).split(',') if s.strip()]
+    for r in ra_names:
+        ra_set.add(r)
+    for i in is_names:
+        is_set.add(i)
+    lecturers.append((name, email, ra_names, is_names))
+
+lines = []
+
+for r in sorted(ra_set):
+    r_esc = _esc(r)
+    rid = str(uuid.uuid4())
+    lines.append(
+        f"INSERT INTO research_area (id, name) SELECT '{rid}'::uuid, '{r_esc}' WHERE NOT EXISTS (SELECT 1 FROM research_area WHERE name = '{r_esc}');"
+    )
+
+for i in sorted(is_set):
+    i_esc = _esc(i)
+    iid = str(uuid.uuid4())
+    lines.append(
+        f"INSERT INTO interested_study (id, name) SELECT '{iid}'::uuid, '{i_esc}' WHERE NOT EXISTS (SELECT 1 FROM interested_study WHERE name = '{i_esc}');"
+    )
+
+for name, email, _, _ in lecturers:
+    name_esc = _esc(name or '')
+    lid = str(uuid.uuid4())
+    if email:
+        email_esc = _esc(email)
+        lines.append(
+            f"INSERT INTO lecturer (id, full_name, email) SELECT '{lid}'::uuid, '{name_esc}', '{email_esc}' WHERE NOT EXISTS (SELECT 1 FROM lecturer WHERE email = '{email_esc}');"
+        )
+    else:
+        lines.append(
+            f"INSERT INTO lecturer (id, full_name, email) SELECT '{lid}'::uuid, '{name_esc}', NULL WHERE NOT EXISTS (SELECT 1 FROM lecturer WHERE full_name = '{name_esc}');"
+        )
+
+for name, email, ra_names, is_names in lecturers:
+    if email:
+        lecturer_condition = f"l.email = '{_esc(email)}'"
+    else:
+        lecturer_condition = f"l.full_name = '{_esc(name or '')}'"
+
+    for r in ra_names:
+        r_esc = _esc(r)
+        lines.append(
+            f"INSERT INTO lecturer_research_area (lecturer_id, research_area_id) SELECT l.id, r.id FROM lecturer l, research_area r WHERE {lecturer_condition} AND r.name = '{r_esc}' AND NOT EXISTS (SELECT 1 FROM lecturer_research_area lr WHERE lr.lecturer_id = l.id AND lr.research_area_id = r.id);"
+        )
+
+    for isn in is_names:
+        is_esc = _esc(isn)
+        lines.append(
+            f"INSERT INTO lecturer_interested_study (lecturer_id, interested_study_id) SELECT l.id, s.id FROM lecturer l, interested_study s WHERE {lecturer_condition} AND s.name = '{is_esc}' AND NOT EXISTS (SELECT 1 FROM lecturer_interested_study li WHERE li.lecturer_id = l.id AND li.interested_study_id = s.id);"
+        )
+
+with open(sql_path, 'w', encoding='utf-8') as fh:
+    fh.write('\n'.join(lines))
+
+print(f"Wrote SQL file to {sql_path}")
