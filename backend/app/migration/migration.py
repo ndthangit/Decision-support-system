@@ -1,7 +1,6 @@
 from pathlib import Path
 
-from ..databases.postgres import engine
-from ..models import *
+from app.databases.postgres import engine
 
 
 async def _init_sql() -> None:

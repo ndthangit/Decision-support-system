@@ -3,18 +3,17 @@ from fastapi.routing import APIRoute
 from starlette.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from .models import *
 from .databases.postgres import engine, init_db
-from .migration.migration import migrate_database
+# from .migration.migration import migrate_database
+#
+#
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     await init_db()
+#     await migrate_database()
+#     yield
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await init_db()
-    await migrate_database()
-    yield
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
